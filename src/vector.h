@@ -12,6 +12,13 @@ typedef struct {
     float z;
 } vec3_t;
 
+typedef struct {
+    float x;
+    float y;
+    float z;
+    float w;
+} vec4_t;
+
 // vector 2D functions
 float vec2_length(vec2_t v);
 vec2_t vec2_add(vec2_t a, vec2_t b);
@@ -36,5 +43,8 @@ vec3_t rotatex(vec3_t v, float angle);
 vec3_t rotatey(vec3_t v, float angle);
 vec3_t rotatez(vec3_t v, float angle);
 
+// vector 4D functions
+vec4_t vec4_from_vec3(vec3_t v);
+vec3_t vec3_from_vec4(vec4_t v);
 #endif // !VECTOR_H
 
