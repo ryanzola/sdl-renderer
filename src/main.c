@@ -5,26 +5,27 @@
 #include "array.h"
 #include "display.h"
 #include "vector.h"
+#include "matrix.h"
 #include "light.h"
 #include "mesh.h"
-#include "matrix.h"
 
 triangle_t* triangles_to_render = NULL;
-
-vec3_t camera_position = {0, 0, 0};
-mat4_t proj_matrix;
 
 bool is_running = false;
 int previous_frame_time = 0;
 
+vec3_t camera_position = { .x = 0, .y = 0, .z = 0 };
+mat4_t proj_matrix;
+
 void setup(void) {
-  render_method = RENDER_WIRE;
+  // Initialize render mode and triangle culling method
+  render_method = RENDER_FILL_TRIANGLE;
   cull_method = CULL_BACKFACE;
 
-  // allocate the required memory in bytes to hold the color buffer
+  // Allocate the required memory in bytes to hold the color buffer
   color_buffer = (uint32_t*)malloc(sizeof(uint32_t) * window_width * window_height);
 
-  // create an SDL texture that is used to disply the color buffer
+  // Creating a SDL texture that is used to display the color buffer
   color_buffer_texture = SDL_CreateTexture(
     renderer,
     SDL_PIXELFORMAT_ARGB8888,
@@ -33,15 +34,16 @@ void setup(void) {
     window_height
   );
 
-  // initialize the projection matrix
-  float fov = M_PI / 3.0f; // 60 degrees
+  // Initialize the perspective projection matrix
+  float fov = M_PI / 3.0; // the same as 180/3, or 60deg
   float aspect = (float)window_height / (float)window_width;
   float znear = 0.1;
   float zfar = 100.0;
   proj_matrix = mat4_make_perspective(fov, aspect, znear, zfar);
 
-  load_cube_mesh_data();
-  // load_obj_file_data("./assets/f22.obj");
+  // Loads the vertex and face values for the mesh data structure
+  // load_cube_mesh_data();
+  load_obj_file_data("./assets/cube.obj");
 }
 
 void process_input(void) {
@@ -86,8 +88,8 @@ void update(void) {
   triangles_to_render = NULL;
 
   // change the mesh rotation and scale per animation frame
-  mesh.rotation.x += 0.02;
-  mesh.rotation.y += 0.02;
+  mesh.rotation.x += 0.03;
+  mesh.rotation.y += 0.03;
   // mesh.rotation.z += 0.02;
 
   // mesh.scale.x += 0.002;
@@ -201,7 +203,7 @@ void update(void) {
     float avg_depth = (transformed_vertices[0].z + transformed_vertices[1].z + transformed_vertices[2].z) / 3.0;
 
     // calculate the light intensity based on how aligned the face normal is with the light direction
-    float light_intensity_factor = vec3_dot(normal, light.direction);
+    float light_intensity_factor = -vec3_dot(normal, light.direction);
 
     // calculate the triangle color based on the light angle
     uint32_t triangle_color = light_apply_intensity(mesh_face.color, light_intensity_factor);
