@@ -5,11 +5,11 @@
 #include "array.h"
 #include "display.h"
 #include "vector.h"
+#include "light.h"
 #include "mesh.h"
 #include "matrix.h"
 
 triangle_t* triangles_to_render = NULL;
-
 
 vec3_t camera_position = {0, 0, 0};
 mat4_t proj_matrix;
@@ -41,7 +41,7 @@ void setup(void) {
   proj_matrix = mat4_make_perspective(fov, aspect, znear, zfar);
 
   load_cube_mesh_data();
-  //load_obj_file_data("./assets/cube.obj");
+  // load_obj_file_data("./assets/f22.obj");
 }
 
 void process_input(void) {
@@ -87,7 +87,7 @@ void update(void) {
 
   // change the mesh rotation and scale per animation frame
   mesh.rotation.x += 0.02;
-  // mesh.rotation.y += 0.02;
+  mesh.rotation.y += 0.02;
   // mesh.rotation.z += 0.02;
 
   // mesh.scale.x += 0.002;
@@ -140,7 +140,6 @@ void update(void) {
     }
    
     // backface culling test to see if the current face should be projected
-    if(cull_method == CULL_BACKFACE) {
       vec3_t vector_a = vec3_from_vec4(transformed_vertices[0]); /*   A   */
       vec3_t vector_b = vec3_from_vec4(transformed_vertices[1]); /*  / \  */
       vec3_t vector_c = vec3_from_vec4(transformed_vertices[2]); /* B---C */
@@ -162,10 +161,18 @@ void update(void) {
       // calculate how aligned the camera is with the face normal using the dot product
       float dot_normal_camera = vec3_dot(normal, camera_ray);
 
+      // calculate how aligned the light ray is with the face normal using the dot product
+      // float dot_normal_light = vec3_dot(normal, light_direction);
+    if(cull_method == CULL_BACKFACE) {
       // if the dot product is negative, the face is facing away from the camera
       if(dot_normal_camera < 0) {
         continue;
       }
+
+      // if the dot product is negative, the face is facing away from the light
+      //if(dot_normal_light < 0) {
+        //continue;
+      //}
     }
     
     vec4_t projected_points[3];
@@ -193,13 +200,19 @@ void update(void) {
     // https://www.youtube.com/watch?v=ZBdE8DElQQU
     float avg_depth = (transformed_vertices[0].z + transformed_vertices[1].z + transformed_vertices[2].z) / 3.0;
 
+    // calculate the light intensity based on how aligned the face normal is with the light direction
+    float light_intensity_factor = vec3_dot(normal, light.direction);
+
+    // calculate the triangle color based on the light angle
+    uint32_t triangle_color = light_apply_intensity(mesh_face.color, light_intensity_factor);
+
     triangle_t projected_triangle = {
       .points = {
         {projected_points[0].x, projected_points[0].y},
         {projected_points[1].x, projected_points[1].y},
         {projected_points[2].x, projected_points[2].y}
       },
-      .color = mesh_face.color,
+      .color = triangle_color,
       .avg_depth = avg_depth
     };
 
