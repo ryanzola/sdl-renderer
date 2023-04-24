@@ -7,6 +7,8 @@
 #include "vector.h"
 #include "matrix.h"
 #include "light.h"
+#include "triangle.h"
+#include "texture.h"
 #include "mesh.h"
 
 triangle_t* triangles_to_render = NULL;
@@ -41,9 +43,14 @@ void setup(void) {
   float zfar = 100.0;
   proj_matrix = mat4_make_perspective(fov, aspect, znear, zfar);
 
-  // Loads the vertex and face values for the mesh data structure
-  // load_cube_mesh_data();
-  load_obj_file_data("./assets/cube.obj");
+  // manually load the hard-coded texture data from the static array
+  mesh_texture = (uint32_t*)REDBRICK_TEXTURE;
+  texture_width = 64;
+  texture_height = 64;
+
+  // loads the vertex and face values for the mesh data structure
+  load_cube_mesh_data();
+  // load_obj_file_data("./assets/f22.obj");
 }
 
 void process_input(void) {
@@ -65,6 +72,10 @@ void process_input(void) {
         render_method = RENDER_FILL_TRIANGLE;
       if(event.key.keysym.sym == SDLK_4)
         render_method = RENDER_FILL_TRIANGLE_WIRE;
+      if(event.key.keysym.sym == SDLK_5)
+        render_method = RENDER_TEXTURE;
+      if(event.key.keysym.sym == SDLK_6)
+        render_method = RENDER_TEXTURE_WIRE;
       if(event.key.keysym.sym == SDLK_c)
         cull_method = CULL_BACKFACE;
       if(event.key.keysym.sym == SDLK_d)
@@ -89,7 +100,7 @@ void update(void) {
 
   // change the mesh rotation and scale per animation frame
   mesh.rotation.x += 0.03;
-  mesh.rotation.y += 0.03;
+  // mesh.rotation.y += 0.03;
   // mesh.rotation.z += 0.02;
 
   // mesh.scale.x += 0.002;
@@ -142,29 +153,28 @@ void update(void) {
     }
    
     // backface culling test to see if the current face should be projected
-      vec3_t vector_a = vec3_from_vec4(transformed_vertices[0]); /*   A   */
-      vec3_t vector_b = vec3_from_vec4(transformed_vertices[1]); /*  / \  */
-      vec3_t vector_c = vec3_from_vec4(transformed_vertices[2]); /* B---C */
+    vec3_t vector_a = vec3_from_vec4(transformed_vertices[0]); /*   A   */
+    vec3_t vector_b = vec3_from_vec4(transformed_vertices[1]); /*  / \  */
+    vec3_t vector_c = vec3_from_vec4(transformed_vertices[2]); /* B---C */
 
-      vec3_t vector_ab = vec3_sub(vector_b, vector_a);
-      vec3_t vector_ac = vec3_sub(vector_c, vector_a);
-      vec3_normalize(&vector_ab);
-      vec3_normalize(&vector_ac);
+    vec3_t vector_ab = vec3_sub(vector_b, vector_a);
+    vec3_t vector_ac = vec3_sub(vector_c, vector_a);
+    vec3_normalize(&vector_ab);
+    vec3_normalize(&vector_ac);
 
-      // compute the face normal (using cross product to find perpendicular)
-      vec3_t normal = vec3_cross(vector_ab, vector_ac);
+    // compute the face normal (using cross product to find perpendicular)
+    vec3_t normal = vec3_cross(vector_ab, vector_ac);
 
-      // normalize the face normal vector
-      vec3_normalize(&normal);
+    // normalize the face normal vector
+    vec3_normalize(&normal);
 
-      // find the vector between a point in the triangle and the camera
-      vec3_t camera_ray = vec3_sub(camera_position, vector_a);
+    // find the vector between a point in the triangle and the camera
+    vec3_t camera_ray = vec3_sub(camera_position, vector_a);
 
-      // calculate how aligned the camera is with the face normal using the dot product
-      float dot_normal_camera = vec3_dot(normal, camera_ray);
+    // calculate how aligned the camera is with the face normal using the dot product
+    float dot_normal_camera = vec3_dot(normal, camera_ray);
 
-      // calculate how aligned the light ray is with the face normal using the dot product
-      // float dot_normal_light = vec3_dot(normal, light_direction);
+    // backface culling check
     if(cull_method == CULL_BACKFACE) {
       // if the dot product is negative, the face is facing away from the camera
       if(dot_normal_camera < 0) {
@@ -185,6 +195,9 @@ void update(void) {
       // scale the projected point
       projected_points[j].x *= window_width / 2.0;
       projected_points[j].y *= window_height / 2.0;
+
+      // invert the y coordinate to account for the difference in coordinate systems
+      projected_points[j].y *= -1;
       
       // transalate the projected point
       projected_points[j].x += window_width / 2.0;
@@ -213,6 +226,11 @@ void update(void) {
         {projected_points[0].x, projected_points[0].y},
         {projected_points[1].x, projected_points[1].y},
         {projected_points[2].x, projected_points[2].y}
+      },
+      .texcoords = {
+        {mesh_face.a_uv.u, mesh_face.a_uv.v},
+        {mesh_face.b_uv.u, mesh_face.b_uv.v},
+        {mesh_face.c_uv.u, mesh_face.c_uv.v}
       },
       .color = triangle_color,
       .avg_depth = avg_depth
@@ -256,8 +274,18 @@ void render(void) {
       );
     }
 
+    // draw texture triangle
+    if(render_method == RENDER_TEXTURE || render_method == RENDER_TEXTURE_WIRE) {
+      draw_texture_triangle(
+        triangle.points[0].x, triangle.points[0].y, triangle.texcoords[0].u, triangle.texcoords[0].v, // vertex A
+        triangle.points[1].x, triangle.points[1].y, triangle.texcoords[1].u, triangle.texcoords[1].v, // vertex B
+        triangle.points[2].x, triangle.points[2].y, triangle.texcoords[2].u, triangle.texcoords[2].v, // vertex C
+        mesh_texture
+      );
+    }
+
     // draw triangle wireframe
-    if(render_method == RENDER_WIRE || render_method == RENDER_WIRE_VERTEX || render_method == RENDER_FILL_TRIANGLE_WIRE) {
+    if(render_method == RENDER_WIRE || render_method == RENDER_WIRE_VERTEX || render_method == RENDER_FILL_TRIANGLE_WIRE || render_method == RENDER_TEXTURE_WIRE) {
       draw_triangle(
         triangle.points[0].x, triangle.points[0].y, // vertex A
         triangle.points[1].x, triangle.points[1].y, // vertex B
